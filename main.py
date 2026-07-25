@@ -1,5 +1,5 @@
 """
-Main Entry Point for running the LangGraph RSS to Qdrant Ingestion & Vector Search Pipeline.
+Main Entry Point for running the LangGraph RSS -> LLM Entity Extraction -> Neo4j Knowledge Graph Pipeline.
 """
 
 import sys
@@ -7,60 +7,70 @@ import logging
 from graph import run_pipeline
 import config
 
+RED = "\033[91m"
+BOLD_RED = "\033[1;91m"
+RESET = "\033[0m"
+
+
 def main():
     print("==================================================")
-    print("  LangGraph RSS -> Qdrant Vector DB Pipeline      ")
+    print("  LangGraph RSS -> LLM -> Neo4j Knowledge Graph  ")
     print("==================================================")
     print(f"Configured Sources ({len(config.RSS_FEEDS)} feeds):")
     for feed in config.RSS_FEEDS:
         print(f"  - [{feed['category']}] {feed['name']}")
-    print(f"Embedding Model: {config.EMBEDDING_MODEL_NAME}")
-    print(f"Qdrant Storage Path: {config.QDRANT_STORAGE_PATH}")
+    print(f"LLM Model: {config.LLM_MODEL_NAME}")
+    print(f"Neo4j URI: {config.NEO4J_URI}")
+    api_key_found = bool(config.GEMINI_API_KEY)
+    print(f"Gemini API Key Detected: {'Yes' if api_key_found else 'No'}")
     print("--------------------------------------------------\n")
 
-    # Allow custom search query via command-line arguments if provided
-    query = sys.argv[1] if len(sys.argv) > 1 else config.DEFAULT_SEARCH_QUERY
-
     # Execute graph pipeline
-    result_state = run_pipeline(search_query=query)
+    result_state = run_pipeline()
 
     # Extract state variables
-    indexed_count = result_state.get("indexed_count", 0)
-    collection_name = result_state.get("qdrant_collection_name", "")
-    search_query = result_state.get("search_query", "")
-    search_results = result_state.get("search_results", [])
+    raw_articles = result_state.get("raw_articles", [])
+    extracted_knowledge = result_state.get("extracted_knowledge", [])
+    total_entities = result_state.get("total_entities_extracted", 0)
+    total_relationships = result_state.get("total_relationships_extracted", 0)
+    neo4j_status = result_state.get("neo4j_status", "UNKNOWN")
+    nodes_created = result_state.get("neo4j_nodes_created", 0)
+    rels_created = result_state.get("neo4j_relationships_created", 0)
     errors = result_state.get("errors", [])
 
     print("\n==================================================")
-    print("           Vector Ingestion & Search              ")
+    print("          Knowledge Extraction & Neo4j            ")
     print("==================================================")
-    print(f" Status: {' SUCCESS' if indexed_count > 0 else ' FAILED'}")
-    print(f" Qdrant Collection: {collection_name}")
-    print(f" Articles Indexed into Vectors: {indexed_count}")
-    print(f" Total Pipeline Errors: {len(errors)}")
+    print(f" Articles Processed:      {len(raw_articles)}")
+    print(f" Total Entities Extracted: {total_entities}")
+    print(f" Total Rel. Extracted:     {total_relationships}")
+    print(f" Neo4j Database Status:    {neo4j_status}")
+    print(f" Neo4j Nodes Created:      {nodes_created}")
+    print(f" Neo4j Links Created:      {rels_created}")
+    print(f" Total Pipeline Warnings:  {len(errors)}")
 
-    print(f"\n--- Similarity Search Query: '{search_query}' ---")
-    if search_results:
-        for idx, res in enumerate(search_results, 1):
-            score = res.get("score")
-            title = res.get("title")
-            source = res.get("source")
-            link = res.get("link")
-            summary = res.get("summary", "")[:120]
-            print(f"\n[{idx}] Match Score: {score:.4f}")
-            print(f"    Source:  {source}")
-            print(f"    Title:   {title}")
-            print(f"    Link:    {link}")
-            print(f"    Snippet: {summary}...")
-    else:
-        print("No matching articles found.")
+    if extracted_knowledge:
+        print("\n--- Extracted Knowledge Graph Sample (Top Articles) ---")
+        for idx, item in enumerate(extracted_knowledge[:3], 1):
+            print(f"\n[{idx}] Title: {item.get('title')}")
+            print(f"    Source: {item.get('source')} | Category: {item.get('category')}")
+
+            entities = item.get("entities", [])
+            ent_str = ", ".join([f"{e.get('name')} ({e.get('type')})" for e in entities[:5]])
+            print(f"    Entities ({len(entities)}): {ent_str}...")
+
+            relationships = item.get("relationships", [])
+            print(f"    Relationships ({len(relationships)}):")
+            for rel in relationships[:4]:
+                print(f"      - ({rel.get('source')}) -[{rel.get('relationship')}]-> ({rel.get('target')})")
 
     if errors:
-        print("\n--- Logged Warnings/Errors ---")
+        print(f"\n{BOLD_RED}--- Logged Warnings/Errors ---{RESET}")
         for err in errors:
-            print(f" - {err}")
+            print(f"{RED} - {err}{RESET}")
 
-    print("\nPipeline execution completed successfully.")
+    print("\nPipeline execution completed.")
+
 
 if __name__ == "__main__":
     main()

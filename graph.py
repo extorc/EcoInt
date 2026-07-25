@@ -1,14 +1,14 @@
 """
 LangGraph Ingestion Pipeline Graph Definition.
 Defines state schema, nodes, edges, and compiles the executable graph.
-Replaces temporary local file storage with Qdrant Vector DB storage & similarity search.
+Pipeline: RSS Fetch -> LLM Entity & Relationship Extraction -> Neo4j Knowledge Graph Ingestion.
 """
 
 import logging
 from typing import TypedDict, List, Dict, Any, Optional
 from langgraph.graph import StateGraph, START, END
 
-from nodes import fetch_rss_node, store_qdrant_node
+from nodes import fetch_rss_node, extract_knowledge_node, store_neo4j_node
 import config
 
 # Configure logging
@@ -25,31 +25,38 @@ class PipelineState(TypedDict, total=False):
     max_articles_per_feed: int
     total_max_articles: int
     raw_articles: List[Dict[str, Any]]
-    qdrant_path: str
-    qdrant_collection_name: str
-    search_query: str
-    search_results: List[Dict[str, Any]]
-    indexed_count: int
+    extracted_knowledge: List[Dict[str, Any]]
+    total_entities_extracted: int
+    total_relationships_extracted: int
+    neo4j_uri: str
+    neo4j_username: str
+    neo4j_password: str
+    neo4j_database: str
+    neo4j_nodes_created: int
+    neo4j_relationships_created: int
+    neo4j_status: str
     errors: List[str]
 
 
 def build_pipeline_graph():
     """
-    Constructs and compiles the ETL LangGraph pipeline.
-    
+    Constructs and compiles the ETL LangGraph pipeline for Neo4j Knowledge Graph.
+
     Graph Topology:
-    [START] -> fetch_rss -> store_qdrant -> [END]
+    [START] -> fetch_rss -> extract_knowledge -> store_neo4j -> [END]
     """
     workflow = StateGraph(PipelineState)
 
     # Register Nodes
     workflow.add_node("fetch_rss", fetch_rss_node)
-    workflow.add_node("store_qdrant", store_qdrant_node)
+    workflow.add_node("extract_knowledge", extract_knowledge_node)
+    workflow.add_node("store_neo4j", store_neo4j_node)
 
     # Register Edges
     workflow.add_edge(START, "fetch_rss")
-    workflow.add_edge("fetch_rss", "store_qdrant")
-    workflow.add_edge("store_qdrant", END)
+    workflow.add_edge("fetch_rss", "extract_knowledge")
+    workflow.add_edge("extract_knowledge", "store_neo4j")
+    workflow.add_edge("store_neo4j", END)
 
     app = workflow.compile()
     return app
@@ -63,8 +70,10 @@ def run_pipeline(
     rss_feeds: Optional[List[Dict[str, str]]] = None,
     max_articles_per_feed: int = config.MAX_ARTICLES_PER_FEED,
     total_max_articles: int = config.TOTAL_MAX_ARTICLES,
-    search_query: str = config.DEFAULT_SEARCH_QUERY,
-    qdrant_path: str = config.QDRANT_STORAGE_PATH
+    neo4j_uri: str = config.NEO4J_URI,
+    neo4j_username: str = config.NEO4J_USERNAME,
+    neo4j_password: str = config.NEO4J_PASSWORD,
+    neo4j_database: str = config.NEO4J_DATABASE
 ) -> Dict[str, Any]:
     """
     Helper function to initialize state and invoke the LangGraph pipeline.
@@ -74,15 +83,20 @@ def run_pipeline(
         "max_articles_per_feed": max_articles_per_feed,
         "total_max_articles": total_max_articles,
         "raw_articles": [],
-        "qdrant_path": qdrant_path,
-        "qdrant_collection_name": config.QDRANT_COLLECTION_NAME,
-        "search_query": search_query,
-        "search_results": [],
-        "indexed_count": 0,
+        "extracted_knowledge": [],
+        "total_entities_extracted": 0,
+        "total_relationships_extracted": 0,
+        "neo4j_uri": neo4j_uri,
+        "neo4j_username": neo4j_username,
+        "neo4j_password": neo4j_password,
+        "neo4j_database": neo4j_database,
+        "neo4j_nodes_created": 0,
+        "neo4j_relationships_created": 0,
+        "neo4j_status": "PENDING",
         "errors": []
     }
-    
-    logger.info("Initializing and invoking LangGraph RSS -> Qdrant Vector DB pipeline...")
+
+    logger.info("Initializing and invoking LangGraph RSS -> LLM Knowledge Extraction -> Neo4j Pipeline...")
     final_state = app.invoke(initial_state)
     return final_state
 
@@ -90,8 +104,10 @@ def run_pipeline(
 if __name__ == "__main__":
     result = run_pipeline()
     print("\n--- Pipeline Run Summary ---")
-    print(f"Collection Name: {result.get('qdrant_collection_name')}")
-    print(f"Indexed Count: {result.get('indexed_count')}")
-    print(f"Search Query: '{result.get('search_query')}'")
-    print(f"Search Results Count: {len(result.get('search_results', []))}")
+    print(f"Articles Fetched: {len(result.get('raw_articles', []))}")
+    print(f"Extracted Entities: {result.get('total_entities_extracted')}")
+    print(f"Extracted Relationships: {result.get('total_relationships_extracted')}")
+    print(f"Neo4j Status: {result.get('neo4j_status')}")
+    print(f"Neo4j Nodes Created: {result.get('neo4j_nodes_created')}")
+    print(f"Neo4j Relationships Created: {result.get('neo4j_relationships_created')}")
     print(f"Errors Encountered: {len(result.get('errors', []))}")
