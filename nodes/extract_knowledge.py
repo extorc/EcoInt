@@ -38,13 +38,20 @@ Text:
 Return ONLY a raw JSON object (no markdown formatting, no code blocks) matching this schema:
 {{
   "entities": [
-    {{"name": "Entity Name", "type": "Organization|Country|Concept|Person|Location|Sector"}}
+    {{
+      "name": "Entity Name",
+      "type": "Organization|Country|Concept|Person|Location|Sector",
+      "description": "A single sentence that precisely identifies what this entity is, grounded in the context of the article. Be specific: e.g. 'The United States federal government, acting as the imposing authority on international trade tariffs.' or 'Apple Inc., the American multinational technology company, as a subject of antitrust scrutiny.'"
+    }}
   ],
   "relationships": [
     {{"source": "Entity A Name", "target": "Entity B Name", "relationship": "RELATION_TYPE"}}
   ]
 }}
-Ensure relationship types are uppercase with underscores (e.g. IMPACTS, OPERATES_IN, REGULATES, ASSOCIATED_WITH).
+Rules:
+- The 'description' must be grounded in this specific article's context — do not give a generic Wikipedia-style definition.
+- Ensure relationship types are uppercase with underscores (e.g. IMPACTS, OPERATES_IN, REGULATES, ASSOCIATED_WITH).
+- Every entity MUST have a non-empty description.
 """
 
     last_exception = None
