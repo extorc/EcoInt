@@ -41,7 +41,7 @@ Return ONLY a raw JSON object (no markdown formatting, no code blocks) matching 
     {{
       "name": "Entity Name",
       "type": "Organization|Country|Concept|Person|Location|Sector",
-      "description": "A single sentence that precisely identifies what this entity is, grounded in the context of the article. Be specific: e.g. 'The United States federal government, acting as the imposing authority on international trade tariffs.' or 'Apple Inc., the American multinational technology company, as a subject of antitrust scrutiny.'"
+      "description": "A single sentence that provides an absolute, objective, encyclopedia-style definition of what this entity fundamentally is. Do NOT describe its role or actions in the context of the article. For example, if the entity is 'US', the description MUST be 'The United States of America is a country in North America.', regardless of what the US did in the news story."
     }}
   ],
   "relationships": [
@@ -49,7 +49,7 @@ Return ONLY a raw JSON object (no markdown formatting, no code blocks) matching 
   ]
 }}
 Rules:
-- The 'description' must be grounded in this specific article's context — do not give a generic Wikipedia-style definition.
+- The 'description' must define the entity in a universal, standalone way. Do NOT include what the entity is doing in this specific news story. This is critical for vector similarity matching across different articles.
 - Ensure relationship types are uppercase with underscores (e.g. IMPACTS, OPERATES_IN, REGULATES, ASSOCIATED_WITH).
 - Every entity MUST have a non-empty description.
 """

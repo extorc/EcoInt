@@ -52,6 +52,13 @@ def _embed_one(text: str, api_key: str) -> List[float]:
                     task_type="SEMANTIC_SIMILARITY"
                 )
                 embedding = result["embedding"]
+                
+                # Enforce exactly 768 dimensions (Neo4j index size).
+                # Gemini models use Matryoshka representation learning, so we can
+                # safely slice the first N dimensions without losing much accuracy.
+                if len(embedding) > EMBEDDING_DIMENSIONS:
+                    embedding = embedding[:EMBEDDING_DIMENSIONS]
+                    
                 logger.debug(f"Embedded via {model_name} → {len(embedding)} dims")
                 return embedding
 
