@@ -8,26 +8,19 @@ import config
 
 logger = logging.getLogger(__name__)
 
-# List of models with confirmed active quota and relaxed token limits
-CANDIDATE_MODELS = [
-    "gemini-flash-lite-latest",
-    "gemini-3.5-flash-lite",
-    "gemini-3.5-flash",
-    "gemini-3.1-flash-lite",
-    "gemini-3-flash-preview",
-    "gemma-4-31b-it",
-    "gemma-4-26b-a4b-it"
+# NVIDIA model candidates (fallbacks for when specific endpoints are down or restricted)
+NVIDIA_MODELS = [
+    "meta/llama-3.1-8b-instruct"
 ]
 
-
-def _extract_with_gemini(text: str, api_key: str) -> Dict[str, Any]:
-    """Extract entities and relationships using Google Gemini API with relaxed quota model retries."""
-    import google.generativeai as genai
-
-    genai.configure(api_key=api_key)
-
-    primary_model = getattr(config, "LLM_MODEL_NAME", "gemini-flash-lite-latest")
-    models_to_try = [primary_model] + [m for m in CANDIDATE_MODELS if m != primary_model]
+def _extract_with_nemotron(text: str, api_key: str) -> Dict[str, Any]:
+    """Extract entities and relationships using NVIDIA's Nemotron API (via OpenAI client)."""
+    from openai import OpenAI
+    
+    client = OpenAI(
+        base_url="https://integrate.api.nvidia.com/v1",
+        api_key=api_key
+    )
 
     prompt = f"""You are an expert financial and economic Knowledge Graph extraction system.
 Analyze the following news text and extract key entities and direct relationships between them.
@@ -55,11 +48,19 @@ Rules:
 """
 
     last_exception = None
-    for model_name in models_to_try:
+    for model_name in NVIDIA_MODELS:
         try:
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(prompt)
-            raw_text = response.text.strip()
+            kwargs = {
+                "model": model_name,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.2,
+                "top_p": 0.7,
+                "max_tokens": 1024,
+                "stream": False
+            }
+
+            response = client.chat.completions.create(**kwargs)
+            raw_text = response.choices[0].message.content.strip()
 
             # Clean markdown backticks if present
             if raw_text.startswith("```"):
@@ -73,14 +74,10 @@ Rules:
                 "model_used": model_name
             }
         except Exception as e:
-            err_msg = str(e)
-            if "Quota" in err_msg or "429" in err_msg:
-                logger.warning(f"Model '{model_name}' hit quota limit (429). Automatically switching to next high-quota candidate model...")
-            else:
-                logger.warning(f"Model '{model_name}' failed ({e}). Trying next model candidate...")
+            logger.warning(f"NVIDIA model '{model_name}' failed ({e}). Trying next candidate...")
             last_exception = e
 
-    raise last_exception if last_exception else RuntimeError("All Gemini model candidates failed.")
+    raise last_exception if last_exception else RuntimeError("All NVIDIA model candidates failed.")
 
 
 def extract_knowledge_node(state: Dict[str, Any]) -> Dict[str, Any]:
@@ -102,7 +99,7 @@ def extract_knowledge_node(state: Dict[str, Any]) -> Dict[str, Any]:
     raw_articles: List[Dict[str, Any]] = state.get("raw_articles", [])
     errors: List[str] = state.get("errors", [])
 
-    gemini_key = getattr(config, "GEMINI_API_KEY", "") or config.get_gemini_api_key()
+    nvidia_api_key = getattr(config, "NVIDIA_API_KEY", "")
 
     extracted_knowledge = []
     total_entities = 0
@@ -119,8 +116,8 @@ def extract_knowledge_node(state: Dict[str, Any]) -> Dict[str, Any]:
             "errors": errors
         }
 
-    if not gemini_key:
-        error_msg = "GEMINI_API_KEY is missing! LLM extraction requires a valid API key configured in environment variables or config.py."
+    if not nvidia_api_key:
+        error_msg = "NVIDIA API key is missing!"
         logger.error(error_msg)
         errors.append(error_msg)
         return {
@@ -138,7 +135,7 @@ def extract_knowledge_node(state: Dict[str, Any]) -> Dict[str, Any]:
         logger.info(f"[{idx}/{len(raw_articles)}] Extracting knowledge via LLM for article: '{title[:60]}...'")
 
         try:
-            extraction_res = _extract_with_gemini(full_text, gemini_key)
+            extraction_res = _extract_with_nemotron(full_text, nvidia_api_key)
             entities = extraction_res.get("entities", [])
             relationships = extraction_res.get("relationships", [])
             model_used = extraction_res.get("model_used", "")

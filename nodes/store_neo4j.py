@@ -22,8 +22,8 @@ import config
 
 logger = logging.getLogger(__name__)
 
-# Silence Neo4j driver's internal notifications (prevents IF NOT EXISTS spam)
-logging.getLogger("neo4j.notifications").setLevel(logging.WARNING)
+# Silence Neo4j driver's internal notifications (prevents IF NOT EXISTS and DEPRECATION spam)
+logging.getLogger("neo4j.notifications").setLevel(logging.ERROR)
 
 # Cosine similarity threshold for entity resolution
 MERGE_THRESHOLD = 0.92

@@ -137,6 +137,9 @@ GEMINI_API_KEY = get_gemini_api_key()
 # High-quota, relaxed-limit model defaults
 LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "gemini-flash-lite-latest")
 
+# NVIDIA configuration
+NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "")
+
 # Neo4j Knowledge Graph configuration
 NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
 NEO4J_USERNAME = os.getenv("NEO4J_USERNAME", "neo4j")
