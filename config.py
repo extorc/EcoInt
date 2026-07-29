@@ -134,8 +134,6 @@ USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTM
 
 # LLM Extraction configuration
 GEMINI_API_KEY = get_gemini_api_key()
-# High-quota, relaxed-limit model defaults
-LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "gemini-flash-lite-latest")
 
 # NVIDIA configuration
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "")

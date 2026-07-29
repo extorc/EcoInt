@@ -19,7 +19,6 @@ def main():
     print(f"Configured Sources ({len(config.RSS_FEEDS)} feeds):")
     for feed in config.RSS_FEEDS:
         print(f"  - [{feed['category']}] {feed['name']}")
-    print(f"LLM Model: {config.LLM_MODEL_NAME}")
     print(f"Neo4j URI: {config.NEO4J_URI}")
     api_key_found = bool(config.GEMINI_API_KEY)
     print(f"Gemini API Key Detected: {'Yes' if api_key_found else 'No'}")
