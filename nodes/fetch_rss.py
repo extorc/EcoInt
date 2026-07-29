@@ -85,6 +85,22 @@ def fetch_rss_node(state: Dict[str, Any]) -> Dict[str, Any]:
                 
                 published = entry.get("published") or entry.get("updated") or entry.get("pubDate") or ""
                 summary = entry.get("summary") or entry.get("description") or ""
+
+                # --- STRICT DOMAIN FILTERING ---
+                # Ensure the article is explicitly about economics, finance, or business.
+                # This prevents generic "top news" (politics, sports, entertainment) from entering the graph.
+                text_to_check = (title + " " + summary).lower()
+                business_keywords = [
+                    "economy", "finance", "business", "market", "stock", "trade", "tariff", 
+                    "bank", "invest", "revenue", "profit", "ceo", "company", "industry", 
+                    "price", "inflation", "tax", "gdp", "fund", "startup", "fed", 
+                    "interest", "rate", "debt", "equity", "dividend", "yield", "bond",
+                    "fiscal", "crypto", "shares", "nasdaq", "sensex", "nifty", "wall street"
+                ]
+                
+                if not any(kw in text_to_check for kw in business_keywords):
+                    logger.debug(f"Skipping off-topic article: '{title[:50]}...'")
+                    continue
                 
                 article_item = {
                     "article_id": article_id,

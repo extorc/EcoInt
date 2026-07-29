@@ -105,7 +105,7 @@ RSS_FEEDS = [
     },
     {
         "name": "Moneycontrol",
-        "url": "https://www.moneycontrol.com/rss/MCtopnews.xml",
+        "url": "https://www.moneycontrol.com/rss/economy.xml",
         "category": "Markets & Economy"
     },
     {

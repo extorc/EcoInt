@@ -254,7 +254,12 @@ def store_neo4j_node(state: Dict[str, Any]) -> Dict[str, Any]:
                 for rel in item.get("relationships", []):
                     src_raw = rel.get("source", "").strip()
                     tgt_raw = rel.get("target", "").strip()
-                    rel_type = rel.get("relationship", "ASSOCIATED_WITH").strip()
+                    rel_type = rel.get("relationship_type", rel.get("relationship", "ASSOCIATED_WITH")).strip()
+                    
+                    try:
+                        score = float(rel.get("score", 0.0))
+                    except (ValueError, TypeError):
+                        score = 0.0
 
                     if not src_raw or not tgt_raw or src_raw == tgt_raw:
                         continue
@@ -271,9 +276,11 @@ def store_neo4j_node(state: Dict[str, Any]) -> Dict[str, Any]:
                             MERGE (s:Entity {{name: $src_name}})
                             MERGE (t:Entity {{name: $tgt_name}})
                             MERGE (s)-[r:`{clean_rel}`]->(t)
+                            SET r.score = $score
                             """,
                             src_name=src_name,
-                            tgt_name=tgt_name
+                            tgt_name=tgt_name,
+                            score=score
                         )
                         relationships_count += 1
                     except Exception as e:

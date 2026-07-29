@@ -33,17 +33,19 @@ Return ONLY a raw JSON object (no markdown formatting, no code blocks) matching 
   "entities": [
     {{
       "name": "Entity Name",
-      "type": "Organization|Country|Concept|Person|Location|Sector",
+      "type": "COMPANY|PERSON|GOVERNMENT|REGULATOR|SECTOR",
       "description": "A single sentence that provides an absolute, objective, encyclopedia-style definition of what this entity fundamentally is. Do NOT describe its role or actions in the context of the article. For example, if the entity is 'US', the description MUST be 'The United States of America is a country in North America.', regardless of what the US did in the news story."
     }}
   ],
   "relationships": [
-    {{"source": "Entity A Name", "target": "Entity B Name", "relationship": "RELATION_TYPE"}}
+    {{"source": "Entity A Name", "target": "Entity B Name", "relationship_type": "SPECTRUM_NAME", "score": 0.5}}
   ]
 }}
 Rules:
-- The 'description' must define the entity in a universal, standalone way. Do NOT include what the entity is doing in this specific news story. This is critical for vector similarity matching across different articles.
-- Ensure relationship types are uppercase with underscores (e.g. IMPACTS, OPERATES_IN, REGULATES, ASSOCIATED_WITH).
+- ENTITIES MUST BE CONCRETE ACTORS: Do NOT extract abstract concepts (e.g., 'Trade', 'Inflation', 'AI', 'Economy', 'Law'). Only extract tangible companies, people, governments, regulators, or sectors.
+- RELATIONSHIP_TYPE MUST BE EXACTLY ONE OF: CAPITAL_FLOW, MARKET_SENTIMENT, DEBT_AND_CREDIT, OPERATIONAL_ALLIANCE, COMPETITIVE_DYNAMICS, SUPPLY_CHAIN_DEPENDENCY, LITIGATION_AND_IP, LABOR_RELATIONS, REGULATORY_STANCE, GEOPOLITICAL_ALIGNMENT.
+- SCORE MUST BE A FLOAT BETWEEN -1.0 AND 1.0: Rate the intensity and direction of the relationship (e.g., -1.0 for divesting/suing/sanctions, 1.0 for investing/subsidizing/merging, 0.0 for neutral/observing).
+- The 'description' must define the entity in a universal, standalone way. Do NOT include what the entity is doing in this specific news story.
 - Every entity MUST have a non-empty description.
 """
 
