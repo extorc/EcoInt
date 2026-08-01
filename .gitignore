@@ -1,3 +1,28 @@
-/__pycache__
-/nodes/__pycache__
+# Environments & Virtual Environments
+venv/
+env/
+ENV/
 .env
+
+# Python Cache & Compiled Files
+__pycache__/
+nodes/__pycache__/
+utils/__pycache__/
+tests/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# IDE & Editor Files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing & Logs
+.pytest_cache/
+*.log
+
+# OS Generated Files
+.DS_Store
+Thumbs.db

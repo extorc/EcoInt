@@ -1,51 +1,13 @@
+"""
+Global Configuration Settings for the Economic Intelligence Knowledge Extraction Pipeline.
+"""
+
 import os
 import sys
 import logging
 from dotenv import load_dotenv
 
 load_dotenv()
-
-
-def get_gemini_api_key() -> str:
-    """
-    Resolves Gemini API Key from:
-    1. os.getenv / os.environ (GEMINI_API_KEY, GOOGLE_API_KEY, etc.)
-    2. .env file
-    3. Windows Registry (User & System environment variables) for newly set system env vars.
-    """
-    for key_name in ["GEMINI_API_KEY", "GOOGLE_API_KEY", "GEMINI_KEY", "GOOGLE_GEMINI_API_KEY"]:
-        val = os.getenv(key_name)
-        if val and val.strip():
-            return val.strip()
-
-    # Case-insensitive search in os.environ
-    for k, v in os.environ.items():
-        if k.upper() in ["GEMINI_API_KEY", "GOOGLE_API_KEY", "GEMINI_KEY"] and v.strip():
-            return v.strip()
-
-    # On Windows, check Windows Registry directly in case terminal was opened before system env var was set
-    if sys.platform == "win32":
-        try:
-            import winreg
-            for hk in [winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE]:
-                path = r"Environment" if hk == winreg.HKEY_CURRENT_USER else r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment"
-                try:
-                    with winreg.OpenKey(hk, path, 0, winreg.KEY_READ) as key:
-                        for target in ["GEMINI_API_KEY", "GOOGLE_API_KEY", "GEMINI_KEY"]:
-                            try:
-                                val, _ = winreg.QueryValueEx(key, target)
-                                if val and str(val).strip():
-                                    val_str = str(val).strip()
-                                    os.environ[target] = val_str
-                                    return val_str
-                            except FileNotFoundError:
-                                pass
-                except Exception:
-                    pass
-        except Exception:
-            pass
-
-    return ""
 
 
 # Colored Logging Formatter for Console
@@ -93,7 +55,7 @@ def setup_colored_logging(log_level: str = "INFO"):
 
 
 # Enable colored logging by default
-LOG_LEVEL = "INFO"
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 setup_colored_logging(LOG_LEVEL)
 
 # RSS News Sources (Business & Economic News)
@@ -125,20 +87,26 @@ RSS_FEEDS = [
     }
 ]
 
-# Pipeline parameters
-MAX_ARTICLES_PER_FEED = 6  # 5 feeds * 6 = 30 articles total
-TOTAL_MAX_ARTICLES = 30
-
-# Network configuration
+# Ingestion Pipeline Parameters
+MAX_ARTICLES_PER_FEED = 5
+TOTAL_MAX_ARTICLES = 25
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
-# LLM Extraction configuration
-GEMINI_API_KEY = get_gemini_api_key()
+# Machine Learning & NLP Model Configurations
+GLINER_MODEL = "urchade/gliner_medium-v2.1"
+SPACY_MODEL = "en_core_web_trf"
+EMBEDDING_MODEL = "BAAI/bge-base-en-v1.5"
+RERANKER_MODEL = "BAAI/bge-reranker-large"
 
-# NVIDIA configuration
+# Entity Resolution Thresholds
+FUZZY_MATCH_THRESHOLD = 85.0
+RERANKER_SCORE_THRESHOLD = 0.65
+
+# API Keys Configuration
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "")
 
-# Neo4j Knowledge Graph configuration
+# Neo4j Knowledge Graph Configuration
 NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
 NEO4J_USERNAME = os.getenv("NEO4J_USERNAME", "neo4j")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "password")

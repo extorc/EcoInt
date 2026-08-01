@@ -1,68 +1,53 @@
 """
 LangGraph Ingestion Pipeline Graph Definition.
-Defines state schema, nodes, edges, and compiles the executable graph.
-
-Pipeline:
-  RSS Fetch
-    → LLM Entity & Relationship Extraction  (now includes 'description' per entity)
-    → Gemini Embedding Generation            (attaches 768-dim vector to each entity)
-    → Neo4j Semantic Ingestion               (cosine similarity >= 0.92 → MERGE, else CREATE)
+Defines state schema, nodes, edges, and compiles the executable 8-stage graph.
 """
 
 import logging
-from typing import TypedDict, List, Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from langgraph.graph import StateGraph, START, END
 
-from nodes import fetch_rss_node, extract_knowledge_node, embed_entities_node, store_neo4j_node
+from data_models import PipelineState
+from nodes import (
+    fetch_rss_preprocess_node,
+    sentence_segmentation_node,
+    named_entity_recognition_node,
+    entity_normalization_node,
+    relationship_extraction_node,
+    entity_resolution_node,
+    entity_embeddings_node,
+    store_neo4j_node,
+)
 import config
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(logging, config.LOG_LEVEL, logging.INFO),
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-)
 logger = logging.getLogger("graph_pipeline")
-
-
-# Define Pipeline State Schema using TypedDict
-class PipelineState(TypedDict, total=False):
-    rss_feeds: List[Dict[str, str]]
-    max_articles_per_feed: int
-    total_max_articles: int
-    raw_articles: List[Dict[str, Any]]
-    extracted_knowledge: List[Dict[str, Any]]   # entities now include 'description' + 'embedding'
-    total_entities_extracted: int
-    total_relationships_extracted: int
-    neo4j_uri: str
-    neo4j_username: str
-    neo4j_password: str
-    neo4j_database: str
-    neo4j_nodes_created: int
-    neo4j_relationships_created: int
-    neo4j_status: str
-    errors: List[str]
 
 
 def build_pipeline_graph():
     """
-    Constructs and compiles the ETL LangGraph pipeline for Neo4j Knowledge Graph.
-
-    Graph Topology:
-    [START] -> fetch_rss -> extract_knowledge -> embed_entities -> store_neo4j -> [END]
+    Constructs and compiles the 8-stage LangGraph workflow for Neo4j Knowledge Graph Ingestion.
     """
     workflow = StateGraph(PipelineState)
 
-    # Register Nodes
-    workflow.add_node("fetch_rss", fetch_rss_node)
-    workflow.add_node("extract_knowledge", extract_knowledge_node)
-    workflow.add_node("embed_entities", embed_entities_node)
+    # 1. Register Nodes
+    workflow.add_node("preprocessing", fetch_rss_preprocess_node)
+    workflow.add_node("sentence_segmentation", sentence_segmentation_node)
+    workflow.add_node("named_entity_recognition", named_entity_recognition_node)
+    workflow.add_node("entity_normalization", entity_normalization_node)
+    workflow.add_node("relationship_extraction", relationship_extraction_node)
+    workflow.add_node("entity_resolution", entity_resolution_node)
+    workflow.add_node("entity_embeddings", entity_embeddings_node)
     workflow.add_node("store_neo4j", store_neo4j_node)
 
-    # Register Edges
-    workflow.add_edge(START, "fetch_rss")
-    workflow.add_edge("fetch_rss", "extract_knowledge")
-    workflow.add_edge("extract_knowledge", "embed_entities")
-    workflow.add_edge("embed_entities", "store_neo4j")
+    # 2. Register Linear Sequential Edges
+    workflow.add_edge(START, "preprocessing")
+    workflow.add_edge("preprocessing", "sentence_segmentation")
+    workflow.add_edge("sentence_segmentation", "named_entity_recognition")
+    workflow.add_edge("named_entity_recognition", "entity_normalization")
+    workflow.add_edge("entity_normalization", "relationship_extraction")
+    workflow.add_edge("relationship_extraction", "entity_resolution")
+    workflow.add_edge("entity_resolution", "entity_embeddings")
+    workflow.add_edge("entity_embeddings", "store_neo4j")
     workflow.add_edge("store_neo4j", END)
 
     app = workflow.compile()
@@ -80,17 +65,22 @@ def run_pipeline(
     neo4j_uri: str = config.NEO4J_URI,
     neo4j_username: str = config.NEO4J_USERNAME,
     neo4j_password: str = config.NEO4J_PASSWORD,
-    neo4j_database: str = config.NEO4J_DATABASE
-) -> Dict[str, Any]:
+    neo4j_database: str = config.NEO4J_DATABASE,
+) -> PipelineState:
     """
-    Helper function to initialize state and invoke the LangGraph pipeline.
+    Helper function to initialize state and execute the LangGraph pipeline.
     """
     initial_state: PipelineState = {
         "rss_feeds": rss_feeds or config.RSS_FEEDS,
         "max_articles_per_feed": max_articles_per_feed,
         "total_max_articles": total_max_articles,
-        "raw_articles": [],
-        "extracted_knowledge": [],
+        "documents": [],
+        "sentences": [],
+        "raw_entities": [],
+        "normalized_entities": [],
+        "relationships": [],
+        "resolved_entities": [],
+        "embedded_entities": [],
         "total_entities_extracted": 0,
         "total_relationships_extracted": 0,
         "neo4j_uri": neo4j_uri,
@@ -100,21 +90,23 @@ def run_pipeline(
         "neo4j_nodes_created": 0,
         "neo4j_relationships_created": 0,
         "neo4j_status": "PENDING",
-        "errors": []
+        "errors": [],
     }
 
-    logger.info("Initializing LangGraph pipeline: RSS → LLM Extraction → Embedding → Neo4j Semantic Ingestion...")
+    logger.info("Starting Economic Intelligence 8-stage LangGraph Pipeline...")
     final_state = app.invoke(initial_state)
     return final_state
 
 
 if __name__ == "__main__":
     result = run_pipeline()
-    print("\n--- Pipeline Run Summary ---")
-    print(f"Articles Fetched:           {len(result.get('raw_articles', []))}")
-    print(f"Extracted Entities:         {result.get('total_entities_extracted')}")
-    print(f"Extracted Relationships:    {result.get('total_relationships_extracted')}")
-    print(f"Neo4j Status:               {result.get('neo4j_status')}")
-    print(f"Neo4j Nodes Created:        {result.get('neo4j_nodes_created')}")
-    print(f"Neo4j Relationships Created:{result.get('neo4j_relationships_created')}")
-    print(f"Errors Encountered:         {len(result.get('errors', []))}")
+    print("\n--- Pipeline Execution Summary ---")
+    print(f"Documents Ingested:      {len(result.get('documents', []))}")
+    print(f"Sentences Segmented:     {len(result.get('sentences', []))}")
+    print(f"Entities Extracted:      {result.get('total_entities_extracted')}")
+    print(f"Canonical Resolved Ents: {len(result.get('resolved_entities', []))}")
+    print(f"Relationships Extracted: {result.get('total_relationships_extracted')}")
+    print(f"Neo4j Status:            {result.get('neo4j_status')}")
+    print(f"Neo4j Nodes Created:     {result.get('neo4j_nodes_created')}")
+    print(f"Neo4j Links Created:     {result.get('neo4j_relationships_created')}")
+    print(f"Warnings/Errors:         {len(result.get('errors', []))}")
