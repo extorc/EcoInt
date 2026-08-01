@@ -126,8 +126,8 @@ RSS_FEEDS = [
 ]
 
 # Pipeline parameters
-MAX_ARTICLES_PER_FEED = 6  # 5 feeds * 6 = 30 articles total
-TOTAL_MAX_ARTICLES = 30
+MAX_ARTICLES_PER_FEED = 40  # 5 feeds * 40 = 200 articles total
+TOTAL_MAX_ARTICLES = 200
 
 # Network configuration
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"

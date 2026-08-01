@@ -25,142 +25,7 @@ logger = logging.getLogger(__name__)
 # Silence Neo4j driver's internal notifications (prevents IF NOT EXISTS and DEPRECATION spam)
 logging.getLogger("neo4j.notifications").setLevel(logging.ERROR)
 
-# Cosine similarity threshold for entity resolution
-MERGE_THRESHOLD = 0.92
-
-# Neo4j vector index settings
-VECTOR_INDEX_NAME = "entity_embedding_index"
-VECTOR_DIMENSIONS = 768
-VECTOR_SIMILARITY_FN = "cosine"
-
-
-def _sanitize_cypher_label(label: str) -> str:
-    """Sanitize string to valid Cypher label / relationship type."""
-    if not label:
-        return "Entity"
-    sanitized = re.sub(r'[^a-zA-Z0-9_]', '_', label.strip())
-    if not sanitized or not sanitized[0].isalpha():
-        sanitized = "E_" + sanitized
-    return sanitized
-
-
-def _ensure_vector_index(session) -> None:
-    """
-    Create the vector index on Entity.embedding if it does not already exist.
-    Uses the Neo4j 5.x vector index syntax.
-    """
-    try:
-        session.run(
-            f"""
-            CREATE VECTOR INDEX {VECTOR_INDEX_NAME} IF NOT EXISTS
-            FOR (e:Entity) ON (e.embedding)
-            OPTIONS {{
-                indexConfig: {{
-                    `vector.dimensions`: {VECTOR_DIMENSIONS},
-                    `vector.similarity_function`: '{VECTOR_SIMILARITY_FN}'
-                }}
-            }}
-            """
-        )
-        logger.info(f"Vector index '{VECTOR_INDEX_NAME}' ensured (created or already exists).")
-    except Exception as e:
-        logger.warning(f"Could not create vector index (continuing without it): {e}")
-
-
-def _find_similar_entity(session, embedding: List[float], top_k: int = 1) -> Optional[Dict[str, Any]]:
-    """
-    Query the Neo4j vector index for the most similar existing entity.
-
-    Returns a dict with keys: name, type, description, score
-    or None if no sufficiently similar entity exists.
-    """
-    if not embedding:
-        return None
-
-    try:
-        result = session.run(
-            f"""
-            CALL db.index.vector.queryNodes('{VECTOR_INDEX_NAME}', $top_k, $embedding)
-            YIELD node, score
-            RETURN node.name AS name, node.type AS type, node.description AS description, score
-            ORDER BY score DESC
-            LIMIT 1
-            """,
-            top_k=top_k,
-            embedding=embedding
-        )
-        record = result.single()
-        if record:
-            return {
-                "name": record["name"],
-                "type": record["type"],
-                "description": record["description"],
-                "score": record["score"]
-            }
-    except Exception as e:
-        logger.warning(f"Vector similarity query failed: {e}")
-
-    return None
-
-
-def _upsert_entity(session, ent_name: str, ent_type: str, description: str,
-                   embedding: List[float]) -> str:
-    """
-    Resolve and upsert a single entity into Neo4j.
-
-    Returns the canonical node name that was ultimately used
-    (may differ from ent_name if merged with an existing node).
-    """
-    valid_label = _sanitize_cypher_label(ent_type)
-
-    # --- Semantic resolution path (embedding available) ---
-    if embedding:
-        match = _find_similar_entity(session, embedding)
-
-        if match and match["score"] >= MERGE_THRESHOLD:
-            # MERGE path: entity already exists — keep original, only add the new type label
-            canonical_name = match["name"]
-            logger.debug(
-                f"MERGE  '{ent_name}' → existing node '{canonical_name}' "
-                f"(similarity={match['score']:.4f} ≥ {MERGE_THRESHOLD})"
-            )
-            # Add the incoming type as an additional label if not already present
-            session.run(
-                f"""
-                MATCH (e:Entity {{name: $canonical_name}})
-                SET e:{valid_label}
-                """,
-                canonical_name=canonical_name
-            )
-            return canonical_name
-
-        else:
-            score_info = f"similarity={match['score']:.4f}" if match else "no match in index"
-            logger.debug(
-                f"CREATE '{ent_name}' as new node ({score_info} < {MERGE_THRESHOLD})"
-            )
-
-    else:
-        # --- Fallback: no embedding — exact name merge ---
-        logger.debug(f"FALLBACK exact-name merge for '{ent_name}' (no embedding available).")
-
-    # CREATE / exact-name-MERGE path
-    # Note: SET e:Label is written inline — no CALL subquery needed (avoids Neo4j deprecation warning).
-    session.run(
-        f"""
-        MERGE (e:Entity {{name: $name}})
-        ON CREATE SET
-            e.type        = $type,
-            e.description = $description,
-            e.embedding   = $embedding
-        SET e:{valid_label}
-        """,
-        name=ent_name,
-        type=ent_type,
-        description=description,
-        embedding=embedding if embedding else None
-    )
-    return ent_name
+from services.neo4j_client import ensure_vector_index, upsert_entity
 
 
 def store_neo4j_node(state: Dict[str, Any]) -> Dict[str, Any]:
@@ -219,7 +84,7 @@ def store_neo4j_node(state: Dict[str, Any]) -> Dict[str, Any]:
         with driver.session(database=database) as session:
 
             # Step 1: Ensure vector index exists
-            _ensure_vector_index(session)
+            ensure_vector_index(session)
 
             # Step 2: Process each article
             for item in extracted_knowledge:
@@ -239,7 +104,7 @@ def store_neo4j_node(state: Dict[str, Any]) -> Dict[str, Any]:
                         continue
 
                     try:
-                        canonical_name = _upsert_entity(
+                        canonical_name = upsert_entity(
                             session, ent_name, ent_type, description, embedding
                         )
                         canonical_map[ent_name] = canonical_name
@@ -281,14 +146,14 @@ def store_neo4j_node(state: Dict[str, Any]) -> Dict[str, Any]:
                             """
                             MATCH (a:Article {url: $url})
                             MATCH (e:Entity {name: $canonical_name})
-                            MERGE (e)-[r:MENTIONED_IN]->(a)
+                            MERGE (e)-[r:IN]->(a)
                             """,
                             url=article_url,
                             canonical_name=canonical_name
                         )
                         relationships_count += 1
                     except Exception as e:
-                        err = f"Failed to create relationship ({canonical_name})-[MENTIONED_IN]->(Article): {e}"
+                        err = f"Failed to create relationship ({canonical_name})-[IN]->(Article): {e}"
                         logger.error(err)
                         errors.append(err)
 
