@@ -2,6 +2,7 @@ import os
 import json
 import logging
 import re
+import time
 from typing import Dict, Any, List
 
 import config
@@ -61,6 +62,8 @@ def extract_knowledge_node(state: Dict[str, Any]) -> Dict[str, Any]:
 
         logger.info(f"[{idx}/{len(raw_articles)}] Extracting knowledge via LLM for article: '{title[:60]}...'")
 
+        start_time = time.time()
+
         try:
             extraction_res = extract_with_nemotron(full_text, nvidia_api_key)
             entities = extraction_res.get("entities", [])
@@ -83,6 +86,12 @@ def extract_knowledge_node(state: Dict[str, Any]) -> Dict[str, Any]:
             err = f"LLM extraction failed for article {article.get('article_id')}: {e}"
             logger.error(err, exc_info=True)
             errors.append(err)
+
+        # Rate limiting: 40 requests per minute (1.5 seconds per request)
+        elapsed = time.time() - start_time
+        sleep_time = 1.5 - elapsed
+        if sleep_time > 0 and idx < len(raw_articles):
+            time.sleep(sleep_time)
 
     logger.info(f"=== Node extract_knowledge Complete: Processed {len(extracted_knowledge)} articles via LLM | Extracted {total_entities} entities. ===")
 

@@ -30,13 +30,13 @@ Return ONLY a raw JSON object (no markdown formatting, no code blocks) matching 
   "entities": [
     {{
       "name": "Entity Name",
-      "type": "COMPANY|PERSON|GOVERNMENT|REGULATOR|SECTOR",
+      "type": "COMPANY|PERSON|ORGANIZATION|GOVERNMENT|COUNTRY|REGULATOR|INDUSTRY|SECTOR|TECHNOLOGY|PRODUCT|COMMODITY|FINANCIAL_INSTRUMENT|MARKET|CURRENCY",
       "description": "A single sentence that provides an absolute, objective, encyclopedia-style definition of what this entity fundamentally is. Do NOT describe its role or actions in the context of the article. For example, if the entity is 'US', the description MUST be 'The United States of America is a country in North America.', regardless of what the US did in the news story."
     }}
   ]
 }}
 Rules:
-- ENTITIES MUST BE CONCRETE ACTORS: Do NOT extract abstract concepts (e.g., 'Trade', 'Inflation', 'AI', 'Economy', 'Law'). Only extract tangible companies, people, governments, regulators, or sectors.
+- STRICT ENTITY TYPES: You must categorize entities strictly into one of the types provided in the schema above.
 - The 'description' must define the entity in a universal, standalone way. Do NOT include what the entity is doing in this specific news story.
 - Every entity MUST have a non-empty description.
 """

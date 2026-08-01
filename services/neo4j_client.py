@@ -9,8 +9,8 @@ logger = logging.getLogger(__name__)
 MERGE_THRESHOLD = 0.92
 
 # Neo4j vector index settings
-VECTOR_INDEX_NAME = "entity_embedding_index"
-VECTOR_DIMENSIONS = 768
+VECTOR_INDEX_NAME = "entity_embedding_index_384"
+VECTOR_DIMENSIONS = 384
 VECTOR_SIMILARITY_FN = "cosine"
 
 
@@ -42,9 +42,11 @@ def ensure_vector_index(session) -> None:
             }}
             """
         )
-        logger.info(f"Vector index '{VECTOR_INDEX_NAME}' ensured (created or already exists).")
+        # Wait for the index to come online before we try to query it
+        session.run(f"CALL db.awaitIndex('{VECTOR_INDEX_NAME}', 300)")
+        logger.info(f"Vector index '{VECTOR_INDEX_NAME}' ensured and ONLINE.")
     except Exception as e:
-        logger.warning(f"Could not create vector index (continuing without it): {e}")
+        logger.warning(f"Could not create or await vector index (continuing without it): {e}")
 
 
 def find_similar_entity(session, embedding: List[float], top_k: int = 1) -> Optional[Dict[str, Any]]:
