@@ -250,41 +250,45 @@ def store_neo4j_node(state: Dict[str, Any]) -> Dict[str, Any]:
                         errors.append(err)
                         canonical_map[ent_name] = ent_name  # best-effort fallback
 
-                # --- Upsert entity-to-entity relationships ---
-                for rel in item.get("relationships", []):
-                    src_raw = rel.get("source", "").strip()
-                    tgt_raw = rel.get("target", "").strip()
-                    rel_type = rel.get("relationship_type", rel.get("relationship", "ASSOCIATED_WITH")).strip()
-                    
-                    try:
-                        score = float(rel.get("score", 0.0))
-                    except (ValueError, TypeError):
-                        score = 0.0
+                article_url = item.get("link", "").strip()
+                article_title = item.get("title", "").strip()
+                article_source = item.get("source", "").strip()
+                published_rss = item.get("published_rss", "").strip()
+                category = item.get("category", "").strip()
 
-                    if not src_raw or not tgt_raw or src_raw == tgt_raw:
-                        continue
+                if not article_url:
+                    logger.warning(f"No link found for article '{article_title}', skipping Article Node creation.")
+                    continue
 
-                    # Resolve to canonical names (handles merged entities)
-                    src_name = canonical_map.get(src_raw, src_raw)
-                    tgt_name = canonical_map.get(tgt_raw, tgt_raw)
+                try:
+                    session.run(
+                        """
+                        MERGE (a:Article {url: $url})
+                        ON CREATE SET a.title = $title, a.source = $source, a.published_rss = $published_rss, a.category = $category
+                        """,
+                        url=article_url, title=article_title, source=article_source, published_rss=published_rss, category=category
+                    )
+                    nodes_count += 1
+                except Exception as e:
+                    err = f"Failed to upsert Article '{article_title}': {e}"
+                    logger.error(err)
+                    errors.append(err)
+                    continue
 
-                    clean_rel = _sanitize_cypher_label(rel_type).upper()
-
+                for ent_name, canonical_name in canonical_map.items():
                     try:
                         session.run(
-                            f"""
-                            MERGE (s:Entity {{name: $src_name}})
-                            MERGE (t:Entity {{name: $tgt_name}})
-                            MERGE (s)-[r:`{clean_rel}`]->(t)
-                            SET r.score = $score
+                            """
+                            MATCH (a:Article {url: $url})
+                            MATCH (e:Entity {name: $canonical_name})
+                            MERGE (e)-[r:MENTIONED_IN]->(a)
                             """,
-                            src_name=src_name,
-                            tgt_name=tgt_name,
-                            score=score
+                            url=article_url,
+                            canonical_name=canonical_name
                         )
                         relationships_count += 1
                     except Exception as e:
-                        err = f"Failed to create relationship ({src_name})-[{clean_rel}]->({tgt_name}): {e}"
+                        err = f"Failed to create relationship ({canonical_name})-[MENTIONED_IN]->(Article): {e}"
                         logger.error(err)
                         errors.append(err)
 

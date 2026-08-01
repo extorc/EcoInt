@@ -31,7 +31,6 @@ def main():
     raw_articles = result_state.get("raw_articles", [])
     extracted_knowledge = result_state.get("extracted_knowledge", [])
     total_entities = result_state.get("total_entities_extracted", 0)
-    total_relationships = result_state.get("total_relationships_extracted", 0)
     neo4j_status = result_state.get("neo4j_status", "UNKNOWN")
     nodes_created = result_state.get("neo4j_nodes_created", 0)
     rels_created = result_state.get("neo4j_relationships_created", 0)
@@ -42,7 +41,6 @@ def main():
     print("==================================================")
     print(f" Articles Processed:      {len(raw_articles)}")
     print(f" Total Entities Extracted: {total_entities}")
-    print(f" Total Rel. Extracted:     {total_relationships}")
     print(f" Neo4j Database Status:    {neo4j_status}")
     print(f" Neo4j Nodes Created:      {nodes_created}")
     print(f" Neo4j Links Created:      {rels_created}")
@@ -57,11 +55,6 @@ def main():
             entities = item.get("entities", [])
             ent_str = ", ".join([f"{e.get('name')} ({e.get('type')})" for e in entities[:5]])
             print(f"    Entities ({len(entities)}): {ent_str}...")
-
-            relationships = item.get("relationships", [])
-            print(f"    Relationships ({len(relationships)}):")
-            for rel in relationships[:4]:
-                print(f"      - ({rel.get('source')}) -[{rel.get('relationship')}]-> ({rel.get('target')})")
 
     if errors:
         print(f"\n{BOLD_RED}--- Logged Warnings/Errors ---{RESET}")

@@ -36,15 +36,10 @@ Return ONLY a raw JSON object (no markdown formatting, no code blocks) matching 
       "type": "COMPANY|PERSON|GOVERNMENT|REGULATOR|SECTOR",
       "description": "A single sentence that provides an absolute, objective, encyclopedia-style definition of what this entity fundamentally is. Do NOT describe its role or actions in the context of the article. For example, if the entity is 'US', the description MUST be 'The United States of America is a country in North America.', regardless of what the US did in the news story."
     }}
-  ],
-  "relationships": [
-    {{"source": "Entity A Name", "target": "Entity B Name", "relationship_type": "SPECTRUM_NAME", "score": 0.5}}
   ]
 }}
 Rules:
 - ENTITIES MUST BE CONCRETE ACTORS: Do NOT extract abstract concepts (e.g., 'Trade', 'Inflation', 'AI', 'Economy', 'Law'). Only extract tangible companies, people, governments, regulators, or sectors.
-- RELATIONSHIP_TYPE MUST BE EXACTLY ONE OF: CAPITAL_FLOW, MARKET_SENTIMENT, DEBT_AND_CREDIT, OPERATIONAL_ALLIANCE, COMPETITIVE_DYNAMICS, SUPPLY_CHAIN_DEPENDENCY, LITIGATION_AND_IP, LABOR_RELATIONS, REGULATORY_STANCE, GEOPOLITICAL_ALIGNMENT.
-- SCORE MUST BE A FLOAT BETWEEN -1.0 AND 1.0: Rate the intensity and direction of the relationship (e.g., -1.0 for divesting/suing/sanctions, 1.0 for investing/subsidizing/merging, 0.0 for neutral/observing).
 - The 'description' must define the entity in a universal, standalone way. Do NOT include what the entity is doing in this specific news story.
 - Every entity MUST have a non-empty description.
 """
@@ -72,7 +67,6 @@ Rules:
             data = json.loads(raw_text)
             return {
                 "entities": data.get("entities", []),
-                "relationships": data.get("relationships", []),
                 "model_used": model_name
             }
         except Exception as e:
@@ -93,7 +87,6 @@ def extract_knowledge_node(state: Dict[str, Any]) -> Dict[str, Any]:
     State Output:
         - extracted_knowledge: List of extracted graph structures per article.
         - total_entities_extracted: Total count of entities extracted across all articles.
-        - total_relationships_extracted: Total count of relationships extracted across all articles.
         - errors: Updated errors list.
     """
     logger.info("=== Starting Node: extract_knowledge (LLM Only) ===")
@@ -105,7 +98,6 @@ def extract_knowledge_node(state: Dict[str, Any]) -> Dict[str, Any]:
 
     extracted_knowledge = []
     total_entities = 0
-    total_relationships = 0
 
     if not raw_articles:
         msg = "No raw articles available for knowledge extraction."
@@ -114,7 +106,6 @@ def extract_knowledge_node(state: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "extracted_knowledge": [],
             "total_entities_extracted": 0,
-            "total_relationships_extracted": 0,
             "errors": errors
         }
 
@@ -125,7 +116,6 @@ def extract_knowledge_node(state: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "extracted_knowledge": [],
             "total_entities_extracted": 0,
-            "total_relationships_extracted": 0,
             "errors": errors
         }
 
@@ -139,11 +129,9 @@ def extract_knowledge_node(state: Dict[str, Any]) -> Dict[str, Any]:
         try:
             extraction_res = _extract_with_nemotron(full_text, nvidia_api_key)
             entities = extraction_res.get("entities", [])
-            relationships = extraction_res.get("relationships", [])
             model_used = extraction_res.get("model_used", "")
 
             total_entities += len(entities)
-            total_relationships += len(relationships)
 
             extracted_knowledge.append({
                 "article_id": article.get("article_id"),
@@ -152,21 +140,19 @@ def extract_knowledge_node(state: Dict[str, Any]) -> Dict[str, Any]:
                 "source": article.get("source"),
                 "category": article.get("category"),
                 "published_rss": article.get("published_rss"),
-                "entities": entities,
-                "relationships": relationships
+                "entities": entities
             })
-            logger.info(f" LLM Extraction successful ({model_used}) for article '{article.get('article_id')}': {len(entities)} entities, {len(relationships)} relationships.")
+            logger.info(f" LLM Extraction successful ({model_used}) for article '{article.get('article_id')}': {len(entities)} entities.")
 
         except Exception as e:
             err = f"LLM extraction failed for article {article.get('article_id')}: {e}"
             logger.error(err, exc_info=True)
             errors.append(err)
 
-    logger.info(f"=== Node extract_knowledge Complete: Processed {len(extracted_knowledge)} articles via LLM | Extracted {total_entities} entities & {total_relationships} relationships. ===")
+    logger.info(f"=== Node extract_knowledge Complete: Processed {len(extracted_knowledge)} articles via LLM | Extracted {total_entities} entities. ===")
 
     return {
         "extracted_knowledge": extracted_knowledge,
         "total_entities_extracted": total_entities,
-        "total_relationships_extracted": total_relationships,
         "errors": errors
     }

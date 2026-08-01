@@ -32,7 +32,6 @@ class PipelineState(TypedDict, total=False):
     raw_articles: List[Dict[str, Any]]
     extracted_knowledge: List[Dict[str, Any]]   # entities now include 'description' + 'embedding'
     total_entities_extracted: int
-    total_relationships_extracted: int
     neo4j_uri: str
     neo4j_username: str
     neo4j_password: str
@@ -92,7 +91,6 @@ def run_pipeline(
         "raw_articles": [],
         "extracted_knowledge": [],
         "total_entities_extracted": 0,
-        "total_relationships_extracted": 0,
         "neo4j_uri": neo4j_uri,
         "neo4j_username": neo4j_username,
         "neo4j_password": neo4j_password,
@@ -113,7 +111,6 @@ if __name__ == "__main__":
     print("\n--- Pipeline Run Summary ---")
     print(f"Articles Fetched:           {len(result.get('raw_articles', []))}")
     print(f"Extracted Entities:         {result.get('total_entities_extracted')}")
-    print(f"Extracted Relationships:    {result.get('total_relationships_extracted')}")
     print(f"Neo4j Status:               {result.get('neo4j_status')}")
     print(f"Neo4j Nodes Created:        {result.get('neo4j_nodes_created')}")
     print(f"Neo4j Relationships Created:{result.get('neo4j_relationships_created')}")
