@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 MERGE_THRESHOLD = 0.92
 
 # Neo4j vector index settings
-VECTOR_INDEX_NAME = "entity_embedding_index_384"
+VECTOR_INDEX_NAME = "entity_embedding_index"
 VECTOR_DIMENSIONS = 384
 VECTOR_SIMILARITY_FN = "cosine"
 

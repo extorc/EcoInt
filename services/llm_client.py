@@ -21,7 +21,7 @@ def extract_with_nemotron(text: str, api_key: str) -> Dict[str, Any]:
 
     prompt = f"""You are an expert financial and economic Knowledge Graph extraction system.
 Analyze the following news text and extract key entities and direct relationships between them.
-
+While creating entities, do not include any entity which is not a proper noun. For example, specific numerical figures, dates, or general terms like 'government' or 'company' should not be included as entities. Only include proper nouns that represent specific entities.
 Text:
 "{text}"
 
@@ -60,6 +60,9 @@ Rules:
             if raw_text.startswith("```"):
                 raw_text = re.sub(r"^```(?:json)?\n?", "", raw_text)
                 raw_text = re.sub(r"\n?```$", "", raw_text)
+
+            # Clean trailing commas (a very common LLM JSON delimiter error)
+            raw_text = re.sub(r',\s*([\]}])', r'\1', raw_text)
 
             data = json.loads(raw_text)
             return {
