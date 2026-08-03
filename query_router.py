@@ -7,7 +7,7 @@ from neo4j import GraphDatabase
 import config
 from nodes.embed_entities import get_embedding_model
 
-from semantic_search import generate_description, get_embedding, search_node
+from services.semantic_search import generate_description, get_embedding, search_node
 import requests
 from bs4 import BeautifulSoup
 
