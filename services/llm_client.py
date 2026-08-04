@@ -21,7 +21,7 @@ def extract_with_nemotron(text: str, api_key: str) -> Dict[str, Any]:
 
     prompt = f"""You are an expert financial and economic Knowledge Graph extraction system.
 Analyze the following news text and extract key entities and direct relationships between them.
-While creating entities, do not include any entity which is not a proper noun. For example, specific numerical figures, dates, or general terms like 'government' or 'company' should not be included as entities. Only include proper nouns that represent specific entities.
+
 Text:
 "{text}"
 
@@ -31,14 +31,21 @@ Return ONLY a raw JSON object (no markdown formatting, no code blocks) matching 
     {{
       "name": "Entity Name",
       "type": "COMPANY|PERSON|ORGANIZATION|GOVERNMENT|COUNTRY|REGULATOR|INDUSTRY|SECTOR|TECHNOLOGY|PRODUCT|COMMODITY|FINANCIAL_INSTRUMENT|MARKET|CURRENCY",
-      "description": "A single sentence that provides an absolute, objective, encyclopedia-style definition of what this entity fundamentally is. Do NOT describe its role or actions in the context of the article. For example, if the entity is 'US', the description MUST be 'The United States of America is a country in North America.', regardless of what the US did in the news story."
+      "description": "A single sentence that provides an absolute, objective, encyclopedia-style definition of what this entity fundamentally is. Do NOT describe its role or actions in the context of the article."
     }}
   ]
 }}
-Rules:
-- STRICT ENTITY TYPES: You must categorize entities strictly into one of the types provided in the schema above.
-- The 'description' must define the entity in a universal, standalone way. Do NOT include what the entity is doing in this specific news story.
-- Every entity MUST have a non-empty description.
+
+CRITICAL EXTRACTION RULES:
+1. STRICT ENTITY TYPES: You must categorize entities strictly into one of the types provided in the schema above.
+2. UNIVERSAL DESCRIPTIONS: The 'description' must define the entity in a universal, standalone way (e.g. "The United States of America is a country in North America."). Do NOT include what the entity is doing in this specific news story. Every entity MUST have a non-empty description.
+3. BAN GENERIC/TEMPORAL TERMS: NEVER extract months, days, years, or seasons (e.g. "July", "September", "2024", "Q3"). NEVER extract generic nouns without context (e.g., "Government", "Budget", "PM", "Company", "Economy", "Bank"). 
+4. ENFORCE DISAMBIGUATION: You MUST fully resolve and disambiguate entities using the context of the article. 
+   - BAD: "Government" -> GOOD: "United Kingdom Government"
+   - BAD: "PM" -> GOOD: "Prime Minister Rishi Sunak"
+   - BAD: "Budget" -> GOOD: "UK Autumn Budget 2023"
+   - BAD: "Fed" -> GOOD: "US Federal Reserve"
+If an entity cannot be fully disambiguated to a globally unique proper noun, DO NOT extract it.
 """
 
     last_exception = None
