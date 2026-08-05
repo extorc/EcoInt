@@ -46,20 +46,18 @@ def build_pipeline_graph():
     """
     Constructs and compiles the ETL LangGraph pipeline for Neo4j Knowledge Graph.
 
-    Graph Topology:
-    [START] -> fetch_rss -> extract_knowledge -> embed_entities -> store_neo4j -> [END]
+    Graph Topology (Mini-Batch processing):
+    [START] -> extract_knowledge -> embed_entities -> store_neo4j -> [END]
     """
     workflow = StateGraph(PipelineState)
 
     # Register Nodes
-    workflow.add_node("fetch_rss", fetch_rss_node)
     workflow.add_node("extract_knowledge", extract_knowledge_node)
     workflow.add_node("embed_entities", embed_entities_node)
     workflow.add_node("store_neo4j", store_neo4j_node)
 
     # Register Edges
-    workflow.add_edge(START, "fetch_rss")
-    workflow.add_edge("fetch_rss", "extract_knowledge")
+    workflow.add_edge(START, "extract_knowledge")
     workflow.add_edge("extract_knowledge", "embed_entities")
     workflow.add_edge("embed_entities", "store_neo4j")
     workflow.add_edge("store_neo4j", END)
@@ -68,7 +66,7 @@ def build_pipeline_graph():
     return app
 
 
-# Pre-compiled executable graph instance
+# Pre-compiled executable graph instance for chunk processing
 app = build_pipeline_graph()
 
 
@@ -82,7 +80,7 @@ def run_pipeline(
     neo4j_database: str = config.NEO4J_DATABASE
 ) -> Dict[str, Any]:
     """
-    Helper function to initialize state and invoke the LangGraph pipeline.
+    Helper function to initialize state, fetch RSS, and invoke the LangGraph pipeline in 10 mini-batches.
     """
     initial_state: PipelineState = {
         "rss_feeds": rss_feeds or config.RSS_FEEDS,
@@ -101,8 +99,55 @@ def run_pipeline(
         "errors": []
     }
 
-    logger.info("Initializing LangGraph pipeline: RSS → LLM Extraction → Embedding → Neo4j Semantic Ingestion...")
-    final_state = app.invoke(initial_state)
+    logger.info("Step 1: Fetching all RSS articles...")
+    fetch_result = fetch_rss_node(initial_state)
+    all_raw_articles = fetch_result.get("raw_articles", [])
+    
+    if not all_raw_articles:
+        logger.warning("No articles fetched. Aborting pipeline.")
+        return initial_state
+
+    # Chunk the articles into 10 batches
+    import math
+    num_batches = 10
+    chunk_size = math.ceil(len(all_raw_articles) / num_batches)
+    chunks = [all_raw_articles[i:i + chunk_size] for i in range(0, len(all_raw_articles), chunk_size)]
+
+    total_nodes = 0
+    total_rels = 0
+    total_entities = 0
+    all_errors = fetch_result.get("errors", [])
+    
+    logger.info(f"Step 2: Processing {len(all_raw_articles)} articles across {len(chunks)} mini-batches...")
+
+    for i, chunk in enumerate(chunks, 1):
+        if not chunk:
+            continue
+            
+        logger.info(f"--- Starting Mini-Batch {i}/{len(chunks)} ({len(chunk)} articles) ---")
+        
+        batch_state = initial_state.copy()
+        batch_state["raw_articles"] = chunk
+        batch_state["extracted_knowledge"] = []
+        batch_state["errors"] = []
+        
+        batch_result = app.invoke(batch_state)
+        
+        total_nodes += batch_result.get("neo4j_nodes_created", 0)
+        total_rels += batch_result.get("neo4j_relationships_created", 0)
+        total_entities += batch_result.get("total_entities_extracted", 0)
+        all_errors.extend(batch_result.get("errors", []))
+        
+        logger.info(f"--- Finished Mini-Batch {i}/{len(chunks)} ---")
+
+    final_state = initial_state.copy()
+    final_state["raw_articles"] = all_raw_articles
+    final_state["total_entities_extracted"] = total_entities
+    final_state["neo4j_nodes_created"] = total_nodes
+    final_state["neo4j_relationships_created"] = total_rels
+    final_state["neo4j_status"] = "SUCCESS" if not all_errors else "COMPLETED_WITH_ERRORS"
+    final_state["errors"] = all_errors
+
     return final_state
 
 
