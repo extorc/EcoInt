@@ -107,10 +107,8 @@ def run_pipeline(
         logger.warning("No articles fetched. Aborting pipeline.")
         return initial_state
 
-    # Chunk the articles into 10 batches
-    import math
-    num_batches = 10
-    chunk_size = math.ceil(len(all_raw_articles) / num_batches)
+    # Chunk the articles into batches of 10
+    chunk_size = 10
     chunks = [all_raw_articles[i:i + chunk_size] for i in range(0, len(all_raw_articles), chunk_size)]
 
     total_nodes = 0
@@ -118,7 +116,7 @@ def run_pipeline(
     total_entities = 0
     all_errors = fetch_result.get("errors", [])
     
-    logger.info(f"Step 2: Processing {len(all_raw_articles)} articles across {len(chunks)} mini-batches...")
+    logger.info(f"Step 2: Processing {len(all_raw_articles)} articles across {len(chunks)} mini-batches (size {chunk_size})...")
 
     for i, chunk in enumerate(chunks, 1):
         if not chunk:
