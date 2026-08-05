@@ -150,8 +150,29 @@ def main():
                 if not results:
                     logging.error(f"Could not find any match in DB for entity: {ent}")
                     sys.exit(1)
-                best_match = results[0]['props']['name']
-                logging.info(f"Resolved '{ent}' to Graph Node: '{best_match}' (score: {results[0]['score']:.4f})")
+                    
+                print(f"\nTop graph node matches for '{ent}':")
+                for idx, r in enumerate(results, 1):
+                    score = r.get("score", 0)
+                    match_name = r.get("props", {}).get("name", "Unknown")
+                    print(f"  [{idx}] {match_name} (Score: {score:.4f})")
+                    
+                while True:
+                    try:
+                        choice = input(f"Select best match for '{ent}' (1-{len(results)}) [Default 1]: ").strip()
+                        if not choice:
+                            choice_idx = 0
+                            break
+                        choice_idx = int(choice) - 1
+                        if 0 <= choice_idx < len(results):
+                            break
+                        else:
+                            print(f"Please enter a number between 1 and {len(results)}.")
+                    except ValueError:
+                        print("Please enter a valid number.")
+                        
+                best_match = results[choice_idx]['props']['name']
+                logging.info(f"Selected '{ent}' -> Graph Node: '{best_match}' (score: {results[choice_idx]['score']:.4f})")
                 resolved_nodes.append(best_match)
 
             logging.info(f"Finding path and connecting articles between '{resolved_nodes[0]}' and '{resolved_nodes[1]}'...")
