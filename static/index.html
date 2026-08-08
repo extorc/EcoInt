@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EcoInt | Knowledge Graph</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- Cytoscape for Graph Visualization -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="glass-panel">
+            <h1>EcoInt</h1>
+            <p>Macroeconomic Causal Graph</p>
+        </header>
+
+        <!-- Graph Container -->
+        <div id="cy"></div>
+
+        <!-- Node Details Modal -->
+        <div id="node-modal" class="glass-panel hidden">
+            <h2 id="node-title">Entity Name</h2>
+            <span id="node-type" class="badge">Type</span>
+            <p id="node-desc" class="desc">Description goes here.</p>
+            
+            <div class="actions">
+                <button id="ingest-btn" class="primary-btn">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    Fetch Articles
+                </button>
+                <button id="merge-btn" class="primary-btn hidden" style="background-color: #8b5cf6; border-color: #7c3aed;" title="Merge selected nodes">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"></circle><circle cx="6" cy="6" r="3"></circle><path d="M13 36h28"></path><path d="M18 15v-2a3 3 0 0 0-3-3H9"></path></svg>
+                    Merge
+                </button>
+                <button id="delete-btn" class="danger-btn" title="Permanently delete node">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+                <button id="close-modal" class="secondary-btn">Close</button>
+            </div>
+            <div id="toast" class="hidden"></div>
+        </div>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>
