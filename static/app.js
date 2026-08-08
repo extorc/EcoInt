@@ -313,4 +313,50 @@ document.addEventListener('DOMContentLoaded', async () => {
             }, 1000);
         }
     });
+
+    // 7. Handle Requested Ingestion
+    const reqIngestInput = document.getElementById('req-ingest-input');
+    const reqIngestBtn = document.getElementById('req-ingest-btn');
+    
+    reqIngestBtn.addEventListener('click', async () => {
+        const query = reqIngestInput.value.trim();
+        if (!query) {
+            alert("Please enter a topic to ingest.");
+            return;
+        }
+
+        reqIngestBtn.disabled = true;
+        reqIngestBtn.style.opacity = 0.5;
+        reqIngestBtn.textContent = "Processing...";
+        
+        // Show global toast or modal toast
+        modal.classList.remove('hidden');
+        titleEl.textContent = "System Message";
+        typeEl.textContent = "INGESTION";
+        descEl.textContent = `Triggering ingestion pipeline for "${query}"...`;
+        toast.classList.remove('hidden');
+        toast.textContent = "Ingestion started successfully!";
+        toast.style.color = "#86efac";
+        
+        try {
+            const res = await fetch('/api/requested_ingestion', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: query })
+            });
+            const result = await res.json();
+            
+            toast.textContent = result.message || "Requested ingestion started!";
+            reqIngestInput.value = ''; // clear input
+        } catch (err) {
+            toast.textContent = "Error triggering requested ingestion.";
+            toast.style.color = "#f87171";
+        } finally {
+            setTimeout(() => {
+                reqIngestBtn.disabled = false;
+                reqIngestBtn.style.opacity = 1;
+                reqIngestBtn.textContent = "Requested Ingestion";
+            }, 1000);
+        }
+    });
 });

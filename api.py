@@ -129,6 +129,31 @@ def ingest_entity(entity_name: str, background_tasks: BackgroundTasks):
     background_tasks.add_task(run_ingestion)
     return {"message": f"Ingestion started for '{entity_name}'. Check server logs for progress."}
 
+@app.post("/api/requested_ingestion")
+def requested_ingestion(payload: dict, background_tasks: BackgroundTasks):
+    query_str = payload.get("query")
+    if not query_str:
+        raise HTTPException(status_code=400, detail="Query is required")
+        
+    query_url = urllib.parse.quote(query_str)
+    search_rss_url = f"https://news.google.com/rss/search?q={query_url}&hl=en-US&gl=US&ceid=US:en"
+    custom_feed = [{"name": f"Google News Search: {query_str}", "url": search_rss_url, "category": "Targeted"}]
+    
+    def run_ingestion():
+        try:
+            print(f"Starting requested background ingestion for {query_str}")
+            run_pipeline(
+                rss_feeds=custom_feed,
+                max_articles_per_feed=10,
+                total_max_articles=10
+            )
+            print(f"Finished requested background ingestion for {query_str}")
+        except Exception as e:
+            print(f"Requested Ingestion failed for {query_str}: {e}")
+
+    background_tasks.add_task(run_ingestion)
+    return {"message": f"Requested Ingestion started for '{query_str}'."}
+
 @app.delete("/api/nodes/{entity_name}")
 def delete_node(entity_name: str):
     query = """
